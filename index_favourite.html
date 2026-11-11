@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pure HTML Slides</title>
+
+<!-- OPTIONAL. MathJax converts LaTeX source ($...$ inline, $$...$$ and \[...\] display) into math drawn in the
+     TeX (Computer Modern) fonts, with hidden MathML for screen readers.
+     It is the ONLY external file in this deck. Delete these two blocks for zero
+     dependencies; native MathML (slide 4) still works with no script at all. -->
+<script>
+  window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']],
+                       displayMath: [['$$','$$'], ['\\[','\\]']],
+                       processEscapes: true },
+                     svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+<style>
+/* ---------- Colours ----------
+   --title is the colour of every slide title: a dark red, #B91C1C.
+   It has a contrast ratio of about 6.3:1 on white. That passes the WCAG (Web Content
+   Accessibility Guidelines) level AA for all text and level AAA for large text.
+   Body text stays black on white (21:1). Change one value to change all titles. */
+:root { --bg: #fff; --fg: #000; --title: #B91C1C; --text: 1; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); overflow: hidden; }
+/* ---------- Fonts: Helvetica, with fallbacks for systems that do not have it ---------- */
+body { font-family: Helvetica, "Helvetica Neue", Arial, "Liberation Sans", sans-serif; }
+code, kbd { font-family: "Latin Modern Mono", Menlo, Consolas, "Courier New", monospace; font-size: .9em; }
+math { font-family: "Latin Modern Math", "STIX Two Math", math; }
+
+/* ---------- Slide canvas: fixed 16:9 design size, scaled to fit the window ---------- */
+/* --W is 1280 for 16:9 and 960 for 4:3. Height stays 720, as in Beamer. */
+#deck { position: absolute; left: 50%; top: 50%; width: calc(var(--W, 1280) * 1px); height: 720px;
+        transform: translate(-50%, -50%) scale(var(--scale, 1)); }
+.slide { position: absolute; inset: 0; padding: 64px 88px 96px; background: var(--bg);
+         display: flex; flex-direction: column; gap: 24px; overflow: auto;
+         font-size: calc(30px * var(--text));
+         opacity: 0; visibility: hidden; transition: opacity .3s ease, visibility .3s; }
+.slide.active { opacity: 1; visibility: visible; }
+.slide h1 { font-family: "Times New Roman", Times, "Liberation Serif", serif; font-size: 2.2em; margin: 0; font-weight: 700; color: var(--title); }
+.slide h2 { font-family: "Times New Roman", Times, "Liberation Serif", serif; font-size: 1.5em; margin: 0 0 8px; font-weight: 700; color: var(--title); }
+.slide p, .slide li { font-size: 1em; line-height: 1.45; margin: 0; }
+.slide ul { margin: 0; padding-left: 1.2em; display: grid; gap: 12px; }
+.slide.center { justify-content: center; align-items: center; text-align: center; }
+.row { display: flex; gap: 48px; align-items: center; justify-content: center; flex: 1; }
+.row > * { flex: 0 1 auto; min-width: 0; }
+.row > svg, .row > img, .row > video { max-width: 100%; height: auto; }
+/* Shrink-to-fit: the engine sets --fit below 1 only when a slide's content does not fit. */
+.slide > * { zoom: var(--fit, 1); }
+.small { font-size: .75em !important; }
+.bar { height: 36px; background: var(--fg); transform-origin: left; margin: 10px 0; }
+
+/* ---------- Fragments: parts of a slide shown one step at a time ---------- */
+.fragment { opacity: 0; visibility: hidden; transition: opacity .3s, visibility .3s; }
+.fragment.shown { opacity: 1; visibility: visible; }
+
+/* ---------- CSS animation that restarts each time its slide opens ---------- */
+.slide.active .grow { animation: grow 1.4s ease-out both; }
+@keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* ---------- Paused motion: animations jump to their final frame ---------- */
+body.paused *, body.paused *::before, body.paused *::after {
+  animation-duration: 0s !important; animation-delay: 0s !important;
+  animation-iteration-count: 1 !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; }
+}
+
+/* ---------- Controls ---------- */
+#controls { position: fixed; left: 12px; bottom: 12px; display: flex; gap: 6px;
+            align-items: center; z-index: 20; font: 18px Helvetica, "Helvetica Neue", Arial, sans-serif; }
+#controls button { min-width: 44px; min-height: 44px; padding: 0 10px; font: inherit;
+                   background: var(--bg); color: var(--fg); border: 2px solid var(--fg);
+                   border-radius: 4px; cursor: pointer; }
+#controls button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+#counter { margin-left: 8px; }
+body.nocontrols #controls { display: none; }
+#controls { flex-wrap: wrap; max-width: calc(100vw - 24px); }
+body.doc { display: flex; flex-direction: column; }
+body.doc #controls { order: -1; position: sticky; top: 0; left: 0; max-width: none;
+                     padding: 8px 16px; background: var(--bg); border-bottom: 2px solid var(--fg); }
+input[type="checkbox"] { accent-color: var(--fg); }
+:focus-visible { outline: 3px solid var(--fg); outline-offset: 3px;
+                 box-shadow: 0 0 0 6px var(--bg); }
+#progress { position: fixed; left: 0; bottom: 0; height: 4px; width: 0;
+            background: var(--fg); transition: width .3s; z-index: 10; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden;
+           clip: rect(0 0 0 0); white-space: nowrap; }
+
+dialog { font: 20px/1.4 Helvetica, "Helvetica Neue", Arial, sans-serif; color: var(--fg); background: var(--bg);
+         border: 2px solid var(--fg); padding: 20px 28px; max-width: min(720px, 92vw);
+         max-height: 92vh; overflow: auto; }
+dialog::backdrop { background: rgba(0,0,0,.5); }
+dialog table { border-collapse: collapse; margin: 8px 0 16px; }
+dialog th, dialog td { text-align: left; padding: 2px 16px 2px 0; vertical-align: top; }
+dialog kbd { font-family: "Latin Modern Mono", Menlo, Consolas, "Courier New", monospace; border: 1px solid var(--fg);
+             padding: 0 5px; border-radius: 3px; }
+dialog label { display: block; margin: 6px 0; }
+dialog input { width: 22px; height: 22px; vertical-align: middle; }
+dialog button { font: inherit; min-height: 44px; padding: 0 16px; background: var(--bg);
+                color: var(--fg); border: 2px solid var(--fg); border-radius: 4px; cursor: pointer; }
+
+/* ---------- Overview (O) and document view (D) ---------- */
+html:has(body.overview), html:has(body.doc) { overflow: auto; height: auto; }
+body.overview, body.doc { overflow: visible; height: auto; }
+body.doc #deck { min-width: 0; width: 100%; }
+body.doc .row > * { min-width: 0; }
+body.overview #deck, body.doc #deck { position: static; transform: none; width: auto; height: auto; }
+body.overview #deck { display: grid; grid-template-columns: repeat(auto-fill, calc(var(--W, 1280) * .25px));
+                      gap: 16px; padding: 16px 16px 80px; justify-content: center; }
+body.overview .slide { position: relative; opacity: 1; visibility: visible;
+                       width: calc(var(--W, 1280) * 1px); height: 720px; zoom: .25; cursor: pointer;
+                       border: 4px solid var(--fg); outline-offset: 8px; }
+body.overview .slide.active { border-width: 16px; }
+/* Document view: one column that reflows; browser zoom works normally. */
+body.doc #deck { width: 100%; max-width: 48em; margin: 0 auto; padding: 16px 16px 96px; }
+body.doc .slide { position: relative; opacity: 1; visibility: visible; display: block;
+                  padding: 24px 0; font-size: calc(1.25rem * var(--text)); overflow: visible;
+                  border-bottom: 2px solid var(--fg); }
+body.doc .slide > * + * { margin-top: 16px; }
+body.doc .slide.center { text-align: left; }
+body.doc .row { justify-content: flex-start; flex-wrap: wrap; }
+body.doc .slide > * { zoom: 1; }
+body.doc .row > * { max-width: 100%; }
+body.doc svg, body.doc img { max-width: 100%; height: auto; }
+body.overview .fragment, body.doc .fragment { opacity: 1; visibility: visible; }
+body.doc #progress, body.overview #progress { display: none; }
+
+/* ---------- Windows High Contrast and other forced-colour modes ---------- */
+@media (forced-colors: active) {
+  .bar, #progress { background: CanvasText; forced-color-adjust: none; }
+}
+
+/* ---------- Print: one slide per page ---------- */
+@page { size: 1280px 720px; margin: 0; }
+@media print {
+  html, body { overflow: visible; height: auto; }
+  #deck { position: static; transform: none; width: auto; height: auto; }
+  .slide { position: relative; opacity: 1; visibility: visible; width: calc(var(--W, 1280) * 1px); height: 720px;
+           break-after: page; overflow: hidden; }
+  .slide:last-child { break-after: auto; }
+  .fragment { opacity: 1; visibility: visible; }
+  body > :not(#deck) { display: none !important; }
+  .slide { padding-bottom: 64px; }
+}
+
+/* ---------- 1990s theme (Windows 95 and Netscape Navigator 3 look) ----------
+   Grey #C0C0C0 chrome, square beveled buttons, a navy #000080 bar, sunken slide window,
+   groove rules under titles, square bullets, blue and purple underlined links,
+   Courier New code. Delete this whole block to return to the plain theme. */
+:root { --chrome: #C0C0C0; --navy: #000080; }
+html, body { background: var(--chrome); }
+.slide { box-shadow: inset 2px 2px 0 #808080, inset 4px 4px 0 #404040, inset -2px -2px 0 #fff, inset -4px -4px 0 #DFDFDF; }
+.slide h1, .slide h2 { border-bottom: 3px groove #808080; padding-bottom: 6px; }
+.slide.center h1 { border-bottom: 0; }
+.slide ul { list-style: square; }
+.slide a, dialog a { color: #0000EE; text-decoration: underline; }
+.slide a:visited, dialog a:visited { color: #551A8B; }
+code, kbd, dialog kbd { font-family: "Courier New", Courier, "Liberation Mono", monospace; }
+#controls, dialog { font-family: "MS Sans Serif", Tahoma, Arial, "Liberation Sans", sans-serif; }
+#controls button, dialog button {
+  background: var(--chrome); color: #000; border: 2px solid; border-radius: 0;
+  border-color: #fff #404040 #404040 #fff; box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #DFDFDF; }
+#controls button:active, dialog button:active,
+#controls button[aria-pressed="true"] {
+  background: var(--chrome); color: #000; border-color: #404040 #fff #fff #404040;
+  box-shadow: inset 1px 1px 0 #808080, inset -1px -1px 0 #DFDFDF; }
+body.doc #controls { background: var(--chrome); border-bottom: 2px groove #808080; }
+:focus-visible { outline: 1px dotted #000; outline-offset: -6px; box-shadow: none; }
+#progress { background: var(--navy); height: 6px; transition: none; }
+dialog { background: var(--chrome); border: 2px solid; border-color: #fff #404040 #404040 #fff;
+         box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #DFDFDF, 4px 4px 0 rgba(0,0,0,.5);
+         padding: 4px 16px 16px; }
+dialog h2 { background: var(--navy); color: #fff; margin: 0 -12px 12px !important; padding: 3px 6px;
+            font-size: 1em; font-weight: 700; }
+dialog kbd { background: #fff; border: 2px inset #808080; border-radius: 0; }
+dialog input[type="checkbox"] { accent-color: var(--navy); }
+
+/* ---------- 1980s theme for the SLIDES only (IBM PC with a CGA display look) ----------
+   Colours are IBM Color Graphics Adapter (CGA) palette values: blue #0000AA, white #FFFFFF,
+   light red #FF5555, yellow #FFFF55, light cyan #55FFFF. Square pixel font stack, double-line
+   frame, scanlines, blocky pixelated images, and no fades (slides change at once).
+   Delete this whole block to return to the 1990s theme. */
+.slide { --bg: #0000AA; --fg: #FFFFFF; --title: #FFFF55; background: #0000AA; color: #FFFFFF;
+         font-family: "Perfect DOS VGA 437", "Px437 IBM VGA8", "Lucida Console", "Courier New", Courier, "Liberation Mono", monospace;
+         border: 6px double #55FFFF; box-shadow: none; transition: none; letter-spacing: .02em;
+         text-shadow: 1px 0 0 rgba(255,255,255,.35); }
+.slide::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 5;
+                background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0, rgba(0,0,0,0) 2px, rgba(0,0,0,.22) 3px, rgba(0,0,0,0) 4px); }
+.slide h1, .slide h2 { font-family: inherit; font-weight: 700; text-transform: uppercase; color: #FFFF55;
+                       border-bottom: 4px solid #FF5555; text-shadow: 3px 3px 0 #000055; }
+.slide.center h1 { border-bottom: 4px solid #FF5555; }
+.slide ul { list-style: none; padding-left: 1.4em; }
+.slide li { position: relative; }
+.slide li::before { content: "\25A0"; position: absolute; left: -1.4em; color: #55FFFF; }
+.slide code, .slide kbd { font-family: inherit; background: #000000; color: #55FF55; padding: 0 .25em; border: 0; }
+.slide a, .slide a:visited { color: #55FFFF; text-decoration: underline; }
+.slide .bar { background: #FF5555; }
+.slide img, .slide video { image-rendering: pixelated; border: 4px solid #FFFFFF; }
+.slide svg { background: #000000; border: 4px solid #FFFFFF; }
+.slide mjx-container svg { background: none; border: 0; }
+.slide mjx-container { color: inherit; }
+.slide svg [stroke="#000"] { stroke: #55FF55; }
+.slide svg [fill="#000"] { fill: #FFFF55; }
+#counter { background: var(--chrome); color: #000; padding: 2px 8px; border: 2px solid; border-color: #404040 #fff #fff #404040; }
+.fragment { transition: none; }
+@media print { .slide::after { display: none; } }
+</style>
+</head>
+<body>
+<main id="deck" aria-label="Presentation">
+
+  <!-- ============ SLIDES: each <section class="slide"> is one slide ============
+       Accessibility rules for your own slides:
+       - Start each slide with a heading (<h1> on the title slide, <h2> elsewhere).
+       - Give every <img> an alt text, and every <svg> role="img" plus a <title>.
+       - Give every video captions: <track kind="captions" src="clip.vtt" srclang="en">.
+       - Do not use colour as the only way to show meaning. -->
+
+  <section class="slide center">
+    <h1>Pure HTML Slides</h1>
+    <p>One file. No framework. Open it in any browser.</p>
+    <p class="small">Press <kbd>?</kbd> or the Help button for all keys.</p>
+  </section>
+
+  <section class="slide">
+    <h2>Step-by-step reveals</h2>
+    <ul>
+      <li>Add <code>class="fragment"</code> to any element.</li>
+      <li class="fragment">Each "next" shows one more fragment.</li>
+      <li class="fragment">Screen readers hear each new fragment.</li>
+      <li class="fragment">A presentation remote sends PageDown and PageUp, so it works too.</li>
+    </ul>
+  </section>
+
+  <section class="slide">
+    <h2>LaTeX through MathJax</h2>
+    <p>Inline: $e^{i\pi} + 1 = 0$.</p>
+    <p>Display:</p>
+    <p>\[ \int_{-\infty}^{\infty} e^{-x^2}\,dx = \sqrt{\pi}
+          \qquad
+          \nabla \times \mathbf{B} = \mu_0 \mathbf{J} + \mu_0\varepsilon_0 \frac{\partial \mathbf{E}}{\partial t} \]</p>
+    <p class="fragment">Also with double dollars: $$ H(X) = -\sum_{i} p_i \log_2 p_i $$</p>
+  </section>
+
+  <section class="slide">
+    <h2>Native MathML (no script)</h2>
+    <p>The browser draws this formula itself, in its installed math font:</p>
+    <p style="font-size:1.4em">
+      <math display="block">
+        <mi>x</mi><mo>=</mo>
+        <mfrac>
+          <mrow><mo>−</mo><mi>b</mi><mo>±</mo>
+            <msqrt><msup><mi>b</mi><mn>2</mn></msup><mo>−</mo><mn>4</mn><mi>a</mi><mi>c</mi></msqrt>
+          </mrow>
+          <mrow><mn>2</mn><mi>a</mi></mrow>
+        </mfrac>
+      </math>
+    </p>
+  </section>
+
+  <section class="slide">
+    <h2>Inline SVG with animation</h2>
+    <div class="row">
+      <svg width="420" height="320" viewBox="0 0 420 320" role="img" aria-labelledby="wave-t">
+        <title id="wave-t">A sine wave. A dot moves along it from left to right.</title>
+        <line x1="20" y1="160" x2="400" y2="160" stroke="#000" stroke-dasharray="4 6"/>
+        <path id="wave" d="M20 160 C 67 40, 115 40, 162 160 S 257 280, 305 160 S 400 40, 400 40"
+              fill="none" stroke="#000" stroke-width="4"/>
+        <circle r="12" fill="#000">
+          <animateMotion dur="3s" repeatCount="indefinite"><mpath href="#wave"/></animateMotion>
+        </circle>
+      </svg>
+      <div style="width:440px">
+        <p>SVG is part of HTML. Its own animation (<code>&lt;animateMotion&gt;</code>) runs live.</p>
+        <div aria-hidden="true">
+          <div class="bar grow"></div>
+          <div class="bar grow" style="width:70%; animation-delay:.3s"></div>
+          <div class="bar grow" style="width:40%; animation-delay:.6s"></div>
+        </div>
+        <p class="small">The bars use CSS (Cascading Style Sheets) animation and restart on each visit.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <h2>GIF and video</h2>
+    <div class="row">
+      <img alt="A radius turns around a circle, like a clock hand." width="240" height="240"
+           src="data:image/gif;base64,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">
+      <div style="width:540px">
+        <p>A GIF (Graphics Interchange Format) is a plain <code>&lt;img&gt;</code>.</p>
+        <p>The Pause button freezes GIFs, SVG, CSS, and video.</p>
+        <p class="small">Video: <code>&lt;video src="clip.mp4" data-autoplay muted loop&gt;</code> with a captions <code>&lt;track&gt;</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="slide center">
+    <h2>End</h2>
+    <p class="small">Edit the &lt;section&gt; blocks in this file to make your own deck.</p>
+  </section>
+
+</main>
+
+<nav id="controls" aria-label="Presentation controls">
+  <button type="button" id="b-prev" aria-label="Previous">◀</button>
+  <button type="button" id="b-next" aria-label="Next">▶</button>
+  <button type="button" id="b-pause" aria-pressed="false">Pause motion</button>
+  <button type="button" id="b-smaller" aria-label="A− smaller text">A−</button>
+  <button type="button" id="b-bigger" aria-label="A+ larger text">A+</button>
+  <button type="button" id="b-doc" aria-pressed="false">Document view</button>
+  <button type="button" id="b-aspect">Aspect 16:9</button>
+  <button type="button" id="b-help">Help</button>
+  <span id="counter" aria-hidden="true"></span>
+</nav>
+<div id="progress" aria-hidden="true"></div>
+<div id="announce" class="sr-only" role="status" aria-live="polite"></div>
+
+<dialog id="help" aria-labelledby="help-t">
+  <h2 id="help-t" style="margin-top:0">Keys and controls</h2>
+  <table>
+    <tr><th scope="row">Next</th><td><kbd>→</kbd> <kbd>↓</kbd> <kbd>Space</kbd> <kbd>PageDown</kbd>, or click the right of the screen</td></tr>
+    <tr><th scope="row">Back</th><td><kbd>←</kbd> <kbd>↑</kbd> <kbd>PageUp</kbd>, or click the left third</td></tr>
+    <tr><th scope="row">First / last</th><td><kbd>Home</kbd> <kbd>End</kbd></td></tr>
+    <tr><th scope="row">Pause motion</th><td><kbd>K</kbd></td></tr>
+    <tr><th scope="row">Text size</th><td><kbd>-</kbd> <kbd>+</kbd></td></tr>
+    <tr><th scope="row">Document view</th><td><kbd>D</kbd> (one scrolling page; browser zoom works)</td></tr>
+    <tr><th scope="row">Aspect ratio</th><td><kbd>A</kbd> (switch between 16:9 and 4:3)</td></tr>
+    <tr><th scope="row">Overview</th><td><kbd>O</kbd></td></tr>
+    <tr><th scope="row">Full screen</th><td><kbd>F</kbd></td></tr>
+    <tr><th scope="row">This help</th><td><kbd>?</kbd></td></tr>
+  </table>
+  <label><input type="checkbox" id="opt-keys" checked> Use single-letter keys (K, D, A, O, F, ?, +, −)</label>
+  <label><input type="checkbox" id="opt-controls" checked> Show the control buttons</label>
+  <form method="dialog" style="margin-top:16px"><button>Close</button></form>
+</dialog>
+
+<script>
+/* ===== Engine: plain JavaScript, no libraries. ===== */
+(() => {
+  const $ = id => document.getElementById(id);
+  const body = document.body, deck = $('deck');
+  const slides = [...deck.querySelectorAll(':scope > .slide')];
+  const announce = $('announce'), help = $('help');
+  let cur = 0, paused = false, textScale = 1, letterKeys = true, aspect = '16:9';
+
+  // Saved per-viewer settings (fails safely if storage is blocked).
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('slides.' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem('slides.' + k, JSON.stringify(v)); } catch {} }
+  };
+
+  // Label each slide for screen readers: "Slide 3 of 7: heading".
+  slides.forEach((s, i) => {
+    s.setAttribute('role', 'group');
+    s.setAttribute('aria-roledescription', 'slide');
+    const h = s.querySelector('h1, h2, h3');
+    s.setAttribute('aria-label', `${i + 1} of ${slides.length}` + (h ? `: ${h.textContent.trim()}` : ''));
+  });
+
+  const mode = () => body.classList.contains('doc') ? 'doc' : body.classList.contains('overview') ? 'overview' : 'slides';
+  const say = t => { announce.textContent = ''; setTimeout(() => announce.textContent = t, 50); };
+
+  // Scale the fixed 1280x720 canvas to fit the window.
+  const canvasW = () => aspect === '4:3' ? 960 : 1280;
+  const fit = () => deck.style.setProperty('--scale', Math.min(innerWidth / canvasW(), innerHeight / 720));
+
+  // Shrink-to-fit: if a slide's content is too big for the canvas, zoom it down
+  // until it fits, so nothing is lost when the aspect ratio changes. Measured at
+  // the base text size, so the A+ button can still enlarge text after this.
+  function fitContent() {
+    const root = document.documentElement, t = root.style.getPropertyValue('--text');
+    const was = body.className; body.classList.remove('doc', 'overview');
+    root.style.setProperty('--text', 1);
+    slides.forEach(s => {
+      let f = 1; s.style.setProperty('--fit', 1);
+      for (let n = 0; n < 12; n++) {
+        const over = Math.max(s.scrollHeight / s.clientHeight, s.scrollWidth / s.clientWidth);
+        if (over <= 1.005 || f <= .4) break;
+        f = Math.max(.4, f / over * .98); s.style.setProperty('--fit', f);
+      }
+    });
+    root.style.setProperty('--text', t || 1);
+    body.className = was;
+  }
+
+  function setAspect(a, speak = true) {
+    aspect = a === '4:3' ? '4:3' : '16:9';
+    document.documentElement.style.setProperty('--W', canvasW());
+    pageSize.textContent = `@page { size: ${canvasW()}px 720px; margin: 0; }`;
+    $('b-aspect').textContent = 'Aspect ' + aspect;
+    store.set('aspect', aspect);
+    fit(); fitContent();
+    if (speak) say('Aspect ratio ' + aspect);
+  }
+  const pageSize = document.head.appendChild(document.createElement('style'));
+  addEventListener('resize', fit); fit();
+
+  // Hidden slides are inert: no focus, not read, not clickable.
+  function setInert() {
+    slides.forEach((s, i) => s.inert = mode() === 'slides' && i !== cur);
+  }
+
+  /* ---------- Motion: pause and resume GIF, SVG, CSS, video ---------- */
+  function freezeGifs(root) {
+    root.querySelectorAll('img').forEach(img => {
+      if (!/\.gif($|\?)|^data:image\/gif/i.test(img.src) || img.dataset.frozen) return;
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth || img.width; c.height = img.naturalHeight || img.height;
+      c.style.width = img.width + 'px'; c.style.height = img.height + 'px';
+      c.setAttribute('role', 'img'); c.setAttribute('aria-label', img.alt);
+      try { c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); } catch {}
+      img.dataset.frozen = '1'; img.hidden = true; img.after(c); img._still = c;
+    });
+  }
+  function thawGifs(root) {
+    root.querySelectorAll('img[data-frozen]').forEach(img => {
+      img._still?.remove(); img.hidden = false; delete img.dataset.frozen;
+      const u = img.src; img.src = ''; img.src = u;
+    });
+  }
+  function applyMotion(root) {
+    root.querySelectorAll('svg').forEach(svg => paused ? svg.pauseAnimations?.() : svg.unpauseAnimations?.());
+    root.querySelectorAll('video').forEach(v => { if (paused) v.pause(); });
+    paused ? freezeGifs(root) : thawGifs(root);
+  }
+  function setPaused(p) {
+    paused = p; body.classList.toggle('paused', p);
+    $('b-pause').setAttribute('aria-pressed', p); $('b-pause').textContent = p ? 'Play motion' : 'Pause motion';
+    applyMotion(document);
+    if (!p && mode() === 'slides') playSlideMedia(slides[cur]);
+    store.set('paused', p); say(p ? 'Motion paused' : 'Motion playing');
+  }
+  function playSlideMedia(s) {
+    s.querySelectorAll('video[data-autoplay]').forEach(v => { v.currentTime = 0; v.play().catch(() => {}); });
+  }
+
+  /* ---------- Navigation ---------- */
+  const frags = i => [...slides[i].querySelectorAll('.fragment')];
+
+  function show(i, fromEnd = false, speak = true) {
+    i = Math.max(0, Math.min(slides.length - 1, i));
+    const old = slides[cur];
+    old.classList.remove('active');
+    old.querySelectorAll('video').forEach(v => v.pause());
+    cur = i;
+    const s = slides[cur];
+    // Re-add "active" so CSS animations restart from the first frame.
+    s.classList.remove('active'); void s.offsetWidth; s.classList.add('active');
+    frags(cur).forEach(f => f.classList.toggle('shown', fromEnd));
+    setInert();
+    if (paused) applyMotion(s);
+    else {
+      s.querySelectorAll('img').forEach(g => { if (/\.gif($|\?)|^data:image\/gif/i.test(g.src)) { const u = g.src; g.src = ''; g.src = u; } });
+      s.querySelectorAll('svg').forEach(svg => svg.setCurrentTime?.(0));
+      playSlideMedia(s);
+    }
+    history.replaceState(null, '', '#' + (cur + 1));
+    $('progress').style.width = (100 * cur / Math.max(1, slides.length - 1)) + '%';
+    $('counter').textContent = (cur + 1) + ' / ' + slides.length;
+    if (speak) say('Slide ' + s.getAttribute('aria-label'));
+  }
+
+  function next() {
+    if (mode() !== 'slides') return;
+    const hidden = frags(cur).find(f => !f.classList.contains('shown'));
+    if (hidden) { hidden.classList.add('shown'); say(hidden.textContent.trim().replace(/\s+/g, ' ')); }
+    else if (cur < slides.length - 1) show(cur + 1);
+    else say('End of presentation');
+  }
+  function prev() {
+    if (mode() !== 'slides') return;
+    const shown = frags(cur).filter(f => f.classList.contains('shown'));
+    if (shown.length) { shown.at(-1).classList.remove('shown'); say('Step back'); }
+    else if (cur > 0) show(cur - 1, true);
+    else say('Start of presentation');
+  }
+
+  /* ---------- Views ---------- */
+  function setView(v) {
+    body.classList.toggle('doc', v === 'doc');
+    body.classList.toggle('overview', v === 'overview');
+    $('b-doc').setAttribute('aria-pressed', v === 'doc');
+    slides.forEach(s => v === 'overview' ? s.tabIndex = 0 : s.removeAttribute('tabindex'));
+    setInert();
+    if (v === 'slides') { fit(); show(cur, false, false); say('Slide view. Slide ' + slides[cur].getAttribute('aria-label')); }
+    else {
+      slides[cur].scrollIntoView({ block: 'start' });
+      if (v === 'overview') slides[cur].focus();
+      say(v === 'doc' ? 'Document view' : 'Overview. Press Enter on a slide to open it.');
+    }
+  }
+  const toggleView = v => setView(mode() === v ? 'slides' : v);
+
+  function setText(t) {
+    textScale = Math.max(.75, Math.min(2, Math.round(t * 100) / 100));
+    document.documentElement.style.setProperty('--text', textScale);
+    store.set('text', textScale);
+  }
+
+  /* ---------- Input ---------- */
+  const interactive = el => el.closest('a, button, input, textarea, select, summary, video, dialog, [contenteditable]');
+
+  addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey || help.open) return;
+    const typing = e.target.closest('input, textarea, select, [contenteditable]');
+    if (typing) return;
+    const onControl = interactive(e.target);
+    const k = e.key;
+
+    if (mode() === 'overview' && k === 'Enter' && e.target.classList?.contains('slide')) {
+      e.preventDefault(); cur = slides.indexOf(e.target); setView('slides'); return;
+    }
+    if (mode() === 'slides') {
+      if (['ArrowRight', 'ArrowDown', 'PageDown'].includes(k) || (!onControl && (k === ' ' || k === 'Enter'))) { e.preventDefault(); return next(); }
+      if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(k)) { e.preventDefault(); return prev(); }
+      if (k === 'Home') { e.preventDefault(); return show(0); }
+      if (k === 'End') { e.preventDefault(); return show(slides.length - 1, true); }
+    }
+    if (k === 'Escape' && mode() !== 'slides') return setView('slides');
+    if (!letterKeys) return;
+    switch (k.toLowerCase()) {
+      case 'k': setPaused(!paused); break;
+      case 'd': toggleView('doc'); break;
+      case 'o': toggleView('overview'); break;
+      case 'a': setAspect(aspect === '16:9' ? '4:3' : '16:9'); break;
+      case 'f': document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); break;
+      case '?': help.showModal(); break;
+      case '+': case '=': setText(textScale + .125); break;
+      case '-': case '_': setText(textScale - .125); break;
+    }
+  });
+
+  // Pointer: click right two-thirds = next, left third = back. Controls are left alone.
+  deck.addEventListener('click', e => {
+    if (mode() === 'overview') {
+      const s = e.target.closest('.slide');
+      if (s) { cur = slides.indexOf(s); setView('slides'); }
+      return;
+    }
+    if (mode() !== 'slides' || interactive(e.target) || getSelection().toString()) return;
+    (e.clientX < innerWidth / 3) ? prev() : next();
+  });
+
+  // Touch swipe (the buttons are the single-tap alternative).
+  let x0 = null;
+  addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+  addEventListener('touchend', e => {
+    if (x0 === null || mode() !== 'slides') return;
+    const dx = e.changedTouches[0].clientX - x0; x0 = null;
+    if (Math.abs(dx) > 50) (dx < 0 ? next : prev)();
+  });
+
+  // Wheel / trackpad in slide view only: one flick = one step.
+  let lock = 0;
+  addEventListener('wheel', e => {
+    if (mode() !== 'slides' || Date.now() < lock || e.ctrlKey) return;
+    lock = Date.now() + 500;
+    (e.deltaY > 0 ? next : prev)();
+  }, { passive: true });
+
+  // Buttons.
+  $('b-prev').onclick = prev;
+  $('b-next').onclick = next;
+  $('b-pause').onclick = () => setPaused(!paused);
+  $('b-smaller').onclick = () => setText(textScale - .125);
+  $('b-bigger').onclick = () => setText(textScale + .125);
+  $('b-doc').onclick = () => toggleView('doc');
+  $('b-aspect').onclick = () => setAspect(aspect === '16:9' ? '4:3' : '16:9');
+  $('b-help').onclick = () => help.showModal();
+  $('opt-keys').onchange = e => { letterKeys = e.target.checked; store.set('keys', letterKeys); };
+  $('opt-controls').onchange = e => { body.classList.toggle('nocontrols', !e.target.checked); store.set('controls', e.target.checked); };
+
+  /* ---------- Start ---------- */
+  letterKeys = store.get('keys', true); $('opt-keys').checked = letterKeys;
+  const showControls = store.get('controls', true);
+  $('opt-controls').checked = showControls; body.classList.toggle('nocontrols', !showControls);
+  setText(store.get('text', 1));
+  setAspect(store.get('aspect', '16:9'), false);
+  // Measure again when the fonts and the LaTeX have finished rendering.
+  document.fonts?.ready.then(fitContent);
+  addEventListener('load', () => { fitContent(); window.MathJax?.startup?.promise?.then(fitContent); });
+  const fromHash = () => (parseInt(location.hash.slice(1), 10) || 1) - 1;
+  addEventListener('hashchange', () => { if (fromHash() !== cur) show(fromHash()); });
+  slides.forEach(s => s.classList.remove('active'));
+  show(fromHash(), false, false);
+  // Respect the operating system's "reduce motion" setting, or the viewer's saved choice.
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const p0 = store.get('paused', reduce);
+  if (p0) addEventListener('load', () => setPaused(true));
+})();
+</script>
+</body>
+</html>
